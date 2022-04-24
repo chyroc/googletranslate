@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -19,7 +20,19 @@ const (
 
 func Translate(query string, from, to Language) (string, error) {
 	apiURL, body, headers := generateParam(query, string(from), string(to))
-	req, err := http.NewRequest("POST", apiURL, strings.NewReader(body))
+
+	res, err := doReqAndResp("POST", apiURL, strings.NewReader(body), headers)
+	if err != nil {
+		return "", err
+	}
+
+	return replaceHtmlTag(res), nil
+}
+
+var httpClient = &http.Client{Timeout: time.Second * 3}
+
+func doReqAndResp(method, url string, body io.Reader, headers map[string]string) (string, error) {
+	req, err := http.NewRequest(method, url, body)
 	if err != nil {
 		return "", err
 	}
@@ -38,6 +51,8 @@ func Translate(query string, from, to Language) (string, error) {
 		return "", err
 	}
 
+	// fmt.Println("raw", string(bs))
+
 	res := []string{}
 	err = json.Unmarshal(bs, &res)
 	if err != nil {
@@ -48,8 +63,6 @@ func Translate(query string, from, to Language) (string, error) {
 	}
 	return res[0], nil
 }
-
-var httpClient = &http.Client{Timeout: time.Second * 3}
 
 func generateParam(q, from, to string) (string, string, map[string]string) {
 	query := url.Values{}
@@ -94,4 +107,10 @@ func generateTkk() string {
 // https://gist.github.com/vielhuber/b7739bf50b2edcf636c43a8f8910def9
 func generateTk(query, ckk string) string {
 	return ""
+}
+
+var htmlTagReg = regexp.MustCompile(`<i>(.*?)</i><b>(.*?)</b>`)
+
+func replaceHtmlTag(s string) string {
+	return htmlTagReg.ReplaceAllString(s, `$2`)
 }
