@@ -18,12 +18,24 @@ const (
 	En Language = "en"
 )
 
-func Translate(query string, from, to Language) (string, error) {
+type Option func(opt *opt)
+
+func WithRaw(b bool) Option {
+	return func(opt *opt) { opt.raw = b }
+}
+
+func Translate(query string, from, to Language, options ...Option) (string, error) {
+	opt := newOpt(options...)
+
 	apiURL, body, headers := generateParam(query, string(from), string(to))
 
 	res, err := doReqAndResp("POST", apiURL, strings.NewReader(body), headers)
 	if err != nil {
 		return "", err
+	}
+
+	if opt.raw {
+		return res, nil
 	}
 
 	return replaceHtmlTag(res), nil
@@ -113,4 +125,16 @@ var htmlTagReg = regexp.MustCompile(`<i>(.*?)</i><b>(.*?)</b>`)
 
 func replaceHtmlTag(s string) string {
 	return htmlTagReg.ReplaceAllString(s, `$2`)
+}
+
+type opt struct {
+	raw bool
+}
+
+func newOpt(options ...Option) *opt {
+	o := &opt{}
+	for _, option := range options {
+		option(o)
+	}
+	return o
 }
